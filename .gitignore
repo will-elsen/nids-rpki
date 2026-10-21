@@ -1,5 +1,8 @@
-rpki_cache/
-deployment_cache/
-.ipynb_checkpoints/
+# Downloaded datasets (the notebook re-fetches anything missing)
+data/*
+!data/.gitkeep
+
 .venv*/
+__pycache__/
+.ipynb_checkpoints/
 CLAUDE.md

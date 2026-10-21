@@ -1,9 +1,8 @@
-[README](README.md) | [Tasks](Tasks.md) | [RPKI](rpki_understanding.md) | Task 2 ⮕ | [ROV Exercise](rpki_rov_exercise.ipynb) | [MANRS](manrs.md) | [Tasks 4–7](Task-deployment-exercise.md) | [Deployment Exercise](rpki_deployment_exercise.ipynb)
+[README](README.md) | [Introduction](Introduction.md) | [Datasets](Datasets.md) | [Tasks](Tasks.md) | [Task 1](Task-1-concepts.md) | Task 2 ⮕ | [Task 3](Task-3-internet-scale.md) | [Task 4](Task-4-rov-shares.md) | [Task 5](Task-5-per-as-coverage.md) | [Task 6](Task-6-manrs.md) | [Task 7](Task-7-bgpsec-footprint.md) | [Notebook](nids-rpki.ipynb)
 
-# Task 2 Guidance: Implementing ROV
+# Task 2 Guidance: Route Origin Validation
 
-This page prepares you to implement `classify_rov` required in
-[Task 2](Tasks.md), inside [rpki_rov_exercise.ipynb](rpki_rov_exercise.ipynb).
+This page provides implementation guidance for Task 2 of [nids-rpki.ipynb](nids-rpki.ipynb).
 
 ## The three-state rule
 
@@ -25,6 +24,8 @@ this prefix at all* — the prefix holder simply has not registered in RPKI. **I
 means *a ROA covers it and affirmatively does not authorize this announcement*. Mixing
 them up is the most common bug in a first ROV implementation.
 
+---
+
 ## Coverage testing with `ipaddress`
 
 The standard-library `ipaddress` module does the hard part:
@@ -38,9 +39,13 @@ net.prefixlen        # 24    -> compare this against the VRP's max_length
 ```
 
 A VRP covers the announcement when the announced network is a subnet of (or equal to) the
-VRP prefix. Note that `subnet_of()` raises a `TypeError` when the two networks belong to
-different address families, and the snapshot holds both IPv4 and IPv6 VRPs — compare
-`.version` first, or filter the table by its `family` column.
+VRP prefix.
+
+> **Gotcha:** `subnet_of()` raises a `TypeError` when the two networks belong to different
+> address families, and the snapshot holds both IPv4 and IPv6 VRPs. Compare `.version`
+> first, or filter the table by its `family` column.
+
+---
 
 ## A shape that works
 
@@ -51,13 +56,15 @@ track one piece of state: *have I seen any covering VRP at all?*
 2. For each VRP row: skip it if the families differ; skip it if its prefix does not cover
    the announcement.
 3. The row covers the announcement — record that fact. If additionally its `asn` equals
-   `origin_asn` **and** the announced prefix length is `<= max_length`, return `"Valid"`
-   immediately.
-4. After the loop: return `"Invalid"` if any covering VRP was seen, else `"Not Found"`.
+   `origin_asn` **and** the announced prefix length is `<= max_length`, the answer is
+   `"Valid"` and you can stop.
+4. After the loop, the answer depends only on whether any covering VRP was seen.
 
 One authorizing VRP is enough for Valid — but you must check *every* covering VRP before
 you may conclude Invalid. A prefix can legitimately be covered by several ROAs at once,
 with different origins, different max lengths, or even different trust anchors.
+
+---
 
 ## Worked example
 
@@ -70,6 +77,18 @@ Given a single VRP `137.110.0.0/16, max_length=20, asn=7377`:
 | `137.110.0.0/24` from AS7377 | `Invalid` | covered, AS matches, but 24 > 20 |
 | `137.110.0.0/16` from AS64500 | `Invalid` | covered, but AS 64500 ≠ 7377 |
 | `8.8.8.0/24` from AS15169 | `Not Found` | no VRP covers this prefix |
+
+---
+
+## Listing the covering VRPs (Task 2.3)
+
+To explain why one announcement is Invalid, you need the rows behind the verdict: every VRP
+in `rov_vrps` that covers its prefix. That is the same family check and `subnet_of()` test
+your classifier performs, applied to the whole `prefix` column to build a boolean mask, for
+example with `Series.map` or `Series.apply`. With the covering rows in front of you, compare
+each one's `asn` and `max_length` with the announcement.
+
+---
 
 ## Common pitfalls
 
@@ -84,12 +103,22 @@ Invalid — this is exactly the sub-prefix-hijack defense Max Length exists for.
 **Returning Not Found when covered.** If any VRP covers the prefix, the answer is Valid
 or Invalid — never Not Found. Set a flag the moment a covering VRP is seen.
 
-**Mixed address families.** Calling `subnet_of()` across IPv4/IPv6 raises `TypeError`.
-Compare `.version` (or filter on the `family` column) before the coverage test.
-
 **Type mismatches on the ASN.** The `asn` column holds plain integers. If you compare
 against a string (`"15169"`) or an `"AS15169"`-style value, everything silently becomes
 Invalid or Not Found. Run the hand-built test table first — it isolates each of these
 mistakes before you touch 400,000 real rows.
 
-[README](README.md) | [Tasks](Tasks.md) | [RPKI](rpki_understanding.md) | Task 2 ⮕ | [ROV Exercise](rpki_rov_exercise.ipynb) | [MANRS](manrs.md) | [Tasks 4–7](Task-deployment-exercise.md) | [Deployment Exercise](rpki_deployment_exercise.ipynb)
+---
+
+## What Your Write-Up Should Address
+
+- **Q5** — the state each of the three AS2635 announcements received, and the Max Length
+  boundary that separates them.
+- **Q6** — which targets were Not Found, what standard routing policy does with them, and
+  why that is the safe choice.
+- **Q7** — one Invalid announcement, its covering VRPs, and which condition failed: wrong
+  origin, excessive length, or both.
+- **Q8** — what the trust anchor does and does not tell you, and the wrong answers that
+  filtering by it would produce.
+
+[README](README.md) | [Introduction](Introduction.md) | [Datasets](Datasets.md) | [Tasks](Tasks.md) | [Task 1](Task-1-concepts.md) | Task 2 ⮕ | [Task 3](Task-3-internet-scale.md) | [Task 4](Task-4-rov-shares.md) | [Task 5](Task-5-per-as-coverage.md) | [Task 6](Task-6-manrs.md) | [Task 7](Task-7-bgpsec-footprint.md) | [Notebook](nids-rpki.ipynb)

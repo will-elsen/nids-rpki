@@ -1,141 +1,157 @@
-[README](README.md) | Tasks ⮕ | [RPKI](rpki_understanding.md) | [Task 2](Task-rov.md) | [ROV Exercise](rpki_rov_exercise.ipynb) | [MANRS](manrs.md) | [Tasks 4–7](Task-deployment-exercise.md) | [Deployment Exercise](rpki_deployment_exercise.ipynb)
+[README](README.md) | [Introduction](Introduction.md) | [Datasets](Datasets.md) | Tasks ⮕ | [Task 1](Task-1-concepts.md) | [Task 2](Task-2-rov.md) | [Task 3](Task-3-internet-scale.md) | [Task 4](Task-4-rov-shares.md) | [Task 5](Task-5-per-as-coverage.md) | [Task 6](Task-6-manrs.md) | [Task 7](Task-7-bgpsec-footprint.md) | [Notebook](nids-rpki.ipynb)
 
 # Tasks
 
-Complete the tasks below in order.
+Complete the tasks below in order. All tasks are performed inside [nids-rpki.ipynb](nids-rpki.ipynb) — replace the `# YOUR CODE HERE` sections with your code and answer the questions in the markdown cells that follow each code cell.
 
-The coding tasks have guidance pages — [Task 2](Task-rov.md) for the ROV exercise and
-[Tasks 4–7](Task-deployment-exercise.md) for the deployment exercise — with the
-algorithms, worked examples, and common pitfalls. Read the relevant guidance before
-writing code.
+---
 
-### Setting up for the notebook tasks
+## Task 0: Setup and Data Access
 
-Both notebooks run on an ordinary local Python 3 installation.
-In each notebook, start by running the dependency installation cell that begins with
-%pip install. This will install the required packages for the notebook.
+All work is done on **NRP's JupyterHub**. The notebook downloads its datasets directly from public archives and caches them under `data/` (see [Datasets.md](Datasets.md)).
 
+- step 1. Access NRP's JupyterHub: [https://jupyterhub-west.nrp-nautilus.io](https://jupyterhub-west.nrp-nautilus.io)
+  - Detailed access instructions: [How to access NRP](https://www.caida.org/projects/nids/how-to/nrp-access/)
+  - When spawning your server, choose an instance with **at least 4 GB of memory**; the internet-scale tasks hold about a million VRPs and 1.1 million announcements at once
+- step 2. Upload `nids-rpki.ipynb` and run every cell in its **Task 0** section, starting with the setup cell that installs dependencies
+- [ ] Verify that the 2023-03-01 VRP snapshot loads (about 400,000 VRPs across five trust anchors)
+- [ ] Verify that the 2026-07-01 VRP snapshot loads (close to a million VRPs)
+- [ ] Verify that the 2026-07-01 routing table loads (roughly 1.1 million announced (prefix, origin) pairs)
+- [ ] Verify that the MANRS participant list and the live rpki-client summary load
 
-## Task 1: Read Understanding RPKI
+---
 
-Detailed Guidance → [Task 1](rpki_understanding.md)
+## Task 1: RPKI Concepts
 
-Completed in [rpki_understanding.md](rpki_understanding.md). Learn how ROAs and ROV
-close the origin-authorization gap.
+Detailed guidance: [Task 1 — Concepts](Task-1-concepts.md)
 
-- [ ] Answer the four *Check your understanding* questions
+### Task 1.1 — ROAs and ROV
 
-## Task 2: Implement Route Origin Validation
+Read the RPKI background in [Introduction.md](Introduction.md), then answer from it.
 
-Detailed Guidance → [Task 2](Task-rov.md)
+- [ ] **Q1** In one sentence each, what is a **ROA** and what is **ROV**?
+- [ ] **Q2** A router runs ROV on a route and gets **Not Found**. Why is dropping every Not Found route a bad idea today?
 
-Completed in [rpki_rov_exercise.ipynb](rpki_rov_exercise.ipynb).
+### Task 1.2 — Max Length
 
-Fill in `classify_rov(announced_prefix, origin_asn, vrps)` so it classifies one BGP
-announcement against a DataFrame of VRPs and returns `"Valid"`, `"Invalid"`, or
-`"Not Found"`. A plain scan over the rows is fine here — correctness of the three states
-matters far more than speed.
+Work through what the ROA's Max Length field authorizes and what it forbids.
 
-- [ ] All 9 hand-built test cases pass
-- [ ] The 11 real announcements in `TARGETS` are classified against the 2023-03-01
-      snapshot (~400,000 VRPs)
-- [ ] Reflection question 1: three targets announce the same address space from the same
-      origin at `/18`, `/24`, and `/25` — explain the state boundary in terms of the
-      covering ROA's max length
-- [ ] Reflection question 2: what does a router with standard policy do with the two
-      **Not Found** targets, and why is accepting them still the safe choice today?
-- [ ] Reflection question 3: for one **Invalid** announcement, print its covering VRPs
-      and identify exactly which condition failed
-- [ ] Reflection question 4: why is ignoring the `trust_anchor` column correct?
+- [ ] **Q3** An operator announces `203.0.113.0/24` and also, sometimes, `203.0.113.0/26`. What should the **Max Length** on their ROA be, and what would break if they set it to `/24`?
 
-## Task 3: Read What is MANRS
+### Task 1.3 — What origin validation cannot see
 
-Detailed Guidance → [Task 3](manrs.md)
+Contrast the two attacks: one RPKI defeats, one it does not.
 
-Completed in [manrs.md](manrs.md). See how MANRS turns the security mechanisms into
-publicly accountable operational practice. No written deliverable — but the deployment
-exercise's MANRS comparison (Task 7) builds directly on this reading.
+- [ ] **Q4** Why can a **prefix hijack** be stopped by RPKI, while a **forged-AS_PATH** attack that ends in the real origin can slip through as Valid?
 
-## Task 4: ROV at Internet Scale
+---
 
-Detailed Guidance → [Task 4](Task-deployment-exercise.md#task-4-rov-at-internet-scale)
+## Task 2: Route Origin Validation
 
-Completed in [rpki_deployment_exercise.ipynb](rpki_deployment_exercise.ipynb).
+Detailed guidance: [Task 2 — Route Origin Validation](Task-2-rov.md)
 
-The deployment notebook classifies ~1.1 million announced (prefix, origin) pairs against
-~1 million VRPs, so a row scan no longer works. The notebook provides a prefix-length
-index (`build_vrp_index` / `covering_vrps`); fill in `classify_rov(prefix, origin_asn,
-vrp_index)` on top of it. The three-state rule is identical to Task 2 — only the lookup
-machinery changes.
+### Task 2.1 — Implement `classify_rov`
 
-- [ ] All 7 hand-built test cases pass
-- [ ] `annotate_rov` runs over the full table and produces `bgp_classified` (a minute or
-      two on the first run, cached afterwards)
+Fill in `classify_rov(announced_prefix, origin_asn, vrps)` so it classifies one announcement against a DataFrame of VRPs and returns `"Valid"`, `"Invalid"`, or `"Not Found"`. A plain scan over the rows is fine. All 9 hand-built test cases in the cell that follows must pass.
 
-## Task 5: How Much of the Internet Implements RPKI?
+### Task 2.2 — Classify real announcements
 
-Detailed Guidance → [Task 5](Task-deployment-exercise.md#task-5-internet-wide-rov-shares)
+Run the provided cells that classify the 11 real announcements in `TARGETS` against the 2023-03-01 snapshot (`rov_vrps`, about 400,000 VRPs).
 
-Completed in [rpki_deployment_exercise.ipynb](rpki_deployment_exercise.ipynb).
+- [ ] **Q5** Three of the targets announce the same address space from the same origin AS at three different prefix lengths (`/18`, `/24`, `/25`). Did all three get the same state? Explain the boundary in terms of the covering ROA's max length.
+- [ ] **Q6** Two targets came back **Not Found**. What would a router configured with standard policy do with them, and why is accepting them still the safe choice today?
 
-From `bgp_classified`, produce a table with one row per ROV state showing the count and
-percentage share of announcements in that state, and a bar chart of the percentage
-shares.
+### Task 2.3 — Diagnose an Invalid announcement
 
-- [ ] Q1: Report your headline numbers: what share of announced (prefix, origin) pairs is
-      Valid, Not Found, and Invalid? (a) Who is actually affected by the Invalid share,
-      and why is it so much smaller than the other two? (b) What does the Not Found share
-      say about how much of the internet would go dark if operators dropped Not Found
-      routes today?
+Build `covering`, the rows of `rov_vrps` whose prefix covers one announcement that came back Invalid.
 
-## Task 6: ROA Coverage, One Network at a Time
+- [ ] **Q7** Pick an announcement that came back **Invalid**. Using the covering VRPs you listed, explain exactly which condition it failed — wrong origin, excessive length, or both.
 
-Detailed Guidance → [Task 6](Task-deployment-exercise.md#task-6-per-as-roa-coverage)
+### Task 2.4 — Trust anchors
 
-Completed in [rpki_deployment_exercise.ipynb](rpki_deployment_exercise.ipynb).
+Consider what the `trust_anchor` column does and does not mean.
 
-Build a DataFrame `per_as`, indexed by origin ASN, with columns `n_announcements` (how
-many pairs the AS originates) and `valid_frac` (the fraction of them that are Valid).
-Then plot a histogram of `valid_frac` across all origin ASes. Task 7 reuses `per_as`,
-so keep the index and column names exactly as specified.
+- [ ] **Q8** Your `classify_rov` ignores the `trust_anchor` column entirely. Why is that correct? What would go wrong if you had filtered the VRPs by trust anchor first?
 
-- [ ] Q2: Describe the shape of the histogram. Why does ROA publishing, as an operational
-      decision, produce an all-or-nothing distribution? What kind of AS would you expect
-      to find in the middle?
+---
 
-## Task 7: MANRS Participants Versus Everyone Else
+## Task 3: ROV at Internet Scale
 
-Detailed Guidance → [Task 7](Task-deployment-exercise.md#task-7-the-manrs-comparison)
+Detailed guidance: [Task 3 — Internet Scale](Task-3-internet-scale.md)
 
-Completed in [rpki_deployment_exercise.ipynb](rpki_deployment_exercise.ipynb).
+### Task 3.1 — Index the VRPs
 
-Split the data by whether the origin ASN belongs to an approved MANRS participant, then
-produce three things: an announcement-level crosstab of ROV-state percentages for the two
-groups; a per-AS summary table (`n_ases`, `median_valid_frac`, `share_zero`,
-`share_full`); and a plot comparing the two `valid_frac` distributions (two CDF curves
-work well).
+Run the provided `build_vrp_index()` and `covering_vrps()` cells, which index the 2026-07-01 IPv4 VRPs by exact prefix.
 
-- [ ] Q3: Quantify the gap between the two groups on `median_valid_frac` and
-      `share_zero`. Give one mechanism by which MANRS participation *causes* better ROA
-      coverage, and one by which the causality runs the other way (self-selection). What
-      data would help you tell the two apart?
+### Task 3.2 — Implement `classify_rov_indexed`
 
-## Task 8: And BGPsec?
+Fill in `classify_rov_indexed(prefix, origin_asn, vrp_index)` on top of `covering_vrps()`. The three-state rule is identical to Task 2; only the lookup changes. All 7 hand-built test cases in the cell that follows must pass.
 
-Detailed Guidance → [Task 8](rpki_deployment_exercise.ipynb)
+### Task 3.3 — Classify the whole routing table
 
-Completed in [rpki_deployment_exercise.ipynb](rpki_deployment_exercise.ipynb). The code
-for this section is provided: `load_bgpsec_snapshot()` fetches the live validated-RPKI
-summary from the rpki-client console and counts ROAs, ASPA records, and BGPsec router
-certificates. Your job is to interpret the counts.
+Run the provided `annotate_rov()` cell. It applies your classifier to about 1.1 million announced (prefix, origin) pairs and produces `bgp_classified` (a minute or two on the first run, cached in `data/` afterwards).
 
-- [ ] Q4: Put the ROA count and the BGPsec router-certificate count side by side and
-      explain the gap in terms of what a network *gets* for publishing each one. What
-      does the ASPA count suggest about which kinds of path-security design can actually
-      deploy?
-- [ ] Reflection question 1: which direction does the timing mismatch (live MANRS list
-      versus archived routing table and VRPs) push your MANRS comparison?
-- [ ] Reflection question 2: why is ROV *enforcement* invisible in every dataset you
-      used, and how would you measure it from the outside?
+---
 
-[README](README.md) | Tasks ⮕ | [RPKI](rpki_understanding.md) | [Task 2](Task-rov.md) | [ROV Exercise](rpki_rov_exercise.ipynb) | [MANRS](manrs.md) | [Tasks 4–7](Task-deployment-exercise.md) | [Deployment Exercise](rpki_deployment_exercise.ipynb)
+## Task 4: How Much of the Internet Implements RPKI?
+
+Detailed guidance: [Task 4 — ROV Shares](Task-4-rov-shares.md)
+
+### Task 4.1 — Internet-wide ROV state shares
+
+From `bgp_classified`, build `rov_summary`: one row per ROV state with the count and percentage share of announcements in that state. Then plot a bar chart of the percentage shares.
+
+- [ ] **Q9** Report your headline numbers: what share of announced (prefix, origin) pairs is **Valid**, **Not Found**, and **Invalid**? Operators who enforce ROV drop Invalid routes — so who is actually affected by the Invalid share you measured, and why is that share so much smaller than the other two? What does the Not Found share say about how much of the internet would go dark if operators dropped Not Found routes today?
+
+---
+
+## Task 5: ROA Coverage, One Network at a Time
+
+Detailed guidance: [Task 5 — Per-AS Coverage](Task-5-per-as-coverage.md)
+
+### Task 5.1 — Per-AS ROA coverage
+
+Build `per_as`, indexed by origin ASN, with columns `n_announcements` and `valid_frac`. Then plot a histogram of `valid_frac` across all origin ASes. Task 6 reuses `per_as`, so keep the index and column names exactly as specified.
+
+- [ ] **Q10** Describe the shape of the histogram. Most ASes sit at one of the two extremes — all or nothing — rather than in the middle. Why does ROA publishing, as an operational decision, produce exactly this shape? What kind of AS would you expect to find *in* the middle?
+
+---
+
+## Task 6: MANRS Participants Versus Everyone Else
+
+Detailed guidance: [Task 6 — MANRS](Task-6-manrs.md)
+
+### Task 6.1 — Announcement-level comparison
+
+Label every row of `bgp_classified` with whether its origin is a MANRS ASN, then build `manrs_crosstab`: the percentage of announcements in each ROV state for the two groups.
+
+### Task 6.2 — Per-AS summary
+
+Label `per_as` the same way, then build `manrs_summary`: one row per group with `n_ases`, `median_valid_frac`, `share_zero`, and `share_full`.
+
+### Task 6.3 — Comparing the distributions
+
+Plot the two groups' `valid_frac` distributions on one figure (two empirical CDF curves work well).
+
+- [ ] **Q11** Quantify the gap: how do the two groups compare on `median_valid_frac` and `share_zero`? This is an observational comparison, not an experiment. Give one mechanism by which MANRS participation *causes* better ROA coverage, and one by which the causality runs the other way (self-selection). What data would help you tell the two apart?
+
+---
+
+## Task 7: The BGPsec and ASPA Footprint
+
+Detailed guidance: [Task 7 — BGPsec Footprint](Task-7-bgpsec-footprint.md)
+
+### Task 7.1 — Count the path-security artifacts
+
+Run the provided cell, which reports the ROA, VRP, ASPA, and BGPsec router-certificate counts from the live rpki-client snapshot loaded in Task 0.
+
+- [ ] **Q12** Put the two counts side by side: ROAs versus BGPsec router certificates. Explain the gap in terms of what a network *gets* for publishing each one today — one is a unilateral act with immediate benefit, the other buys nothing until neighbors join. Compare the ASPA count as well: ASPA is years younger than BGPsec. What does its count suggest about which kinds of path-security design can actually deploy?
+
+### Task 7.2 — Reflect
+
+Step back from the numbers and consider what the datasets could and could not show.
+
+- [ ] **Q13** Your MANRS list is from today; the routing table and VRPs are from `SNAPSHOT_DATE`. Suppose a network published its first ROAs in the gap between the two dates, or joined MANRS last week. Which direction would each case push your MANRS comparison — overstate or understate the participants' lead?
+- [ ] **Q14** This notebook measured *publishing* — MANRS Action 4. The other half of origin validation, networks actually *enforcing* ROV on the routes they hear (Action 1), is invisible in every dataset you used. Why? Sketch how you would measure ROV enforcement from the outside: what would you need to announce, and what would you watch for?
+
+[README](README.md) | [Introduction](Introduction.md) | [Datasets](Datasets.md) | Tasks ⮕ | [Task 1](Task-1-concepts.md) | [Task 2](Task-2-rov.md) | [Task 3](Task-3-internet-scale.md) | [Task 4](Task-4-rov-shares.md) | [Task 5](Task-5-per-as-coverage.md) | [Task 6](Task-6-manrs.md) | [Task 7](Task-7-bgpsec-footprint.md) | [Notebook](nids-rpki.ipynb)
