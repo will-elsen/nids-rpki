@@ -50,9 +50,9 @@ nids-rpki
 
 ### Glossary
 - **AS (Autonomous System)**: A network under a single administrative control (an ISP, cloud provider, university), identified by a globally unique **ASN (AS number)**.
+- **ASPA (Autonomous System Provider Authorization)**: An RPKI object in which an AS lists its authorized upstream providers, letting validators detect route leaks and some path forgeries; an AS can publish one unilaterally.
 - **AS_PATH**: The ordered list of ASes a route has traversed. Each AS prepends its own ASN as it re-advertises the route; the rightmost ASN is the origin.
 - **AS_PATH manipulation (path forgery)**: Advertising a partly or wholly fabricated AS_PATH, for example one that ends in the real owner's ASN so that ROV rates it Valid.
-- **ASPA (Autonomous System Provider Authorization)**: An RPKI object in which an AS lists its authorized upstream providers, letting validators detect route leaks and some path forgeries; an AS can publish one unilaterally.
 - **BGP (Border Gateway Protocol)**: The path-vector routing protocol that exchanges reachability information between independently operated networks [[RFC 4271](https://www.rfc-editor.org/rfc/rfc4271.html)].
 - **BGPsec**: The BGP extension in which every AS on a path signs the route as it forwards it, protecting the entire AS_PATH [[RFC 8205](https://www.rfc-editor.org/rfc/rfc8205.html)].
 - **CDF (Cumulative Distribution Function)**: For each value x, the fraction of a sample at or below x; an empirical CDF plots a sample's sorted values against evenly spaced quantiles.
